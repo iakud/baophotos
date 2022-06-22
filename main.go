@@ -13,7 +13,13 @@ const (
 )
 
 func main() {
-	http.HandleFunc("/", listHandler)
+	if !isExists(UPLOAD_DIR) {
+		if err := os.Mkdir(UPLOAD_DIR, 0666); err != nil {
+			log.Fatalln(err)
+		}
+	}
+	// http.HandleFunc("/", listHandler)
+	http.HandleFunc("/", testHandler)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/view", viewHandler)
 	err := http.ListenAndServe(":8080", nil)
@@ -56,6 +62,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/view?id="+filename,
 			http.StatusFound)
 	}
+}
+func testHandler(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "<h1>BAOBAO的相册</h1>")
 }
 
 func listHandler(w http.ResponseWriter, r *http.Request) {
