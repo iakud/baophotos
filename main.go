@@ -22,7 +22,7 @@ func main() {
 	http.HandleFunc("/", testHandler)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/view", viewHandler)
-	err := http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":80", nil)
 	if err != nil {
 		log.Fatalln(err)
 	}
