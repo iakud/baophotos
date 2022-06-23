@@ -1,11 +1,14 @@
 package main
 
 import (
+	"html/template"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/iakud/baophotos/session"
 )
 
 const (
@@ -18,8 +21,9 @@ func main() {
 			log.Fatalln(err)
 		}
 	}
-	// http.HandleFunc("/", listHandler)
-	http.HandleFunc("/", testHandler)
+	http.HandleFunc("/", listHandler)
+	http.HandleFunc("/login", loginHandler)
+	// http.HandleFunc("/", testHandler)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/view", viewHandler)
 	err := http.ListenAndServe(":80", nil)
@@ -28,14 +32,47 @@ func main() {
 	}
 }
 
-func uploadHandler(w http.ResponseWriter, r *http.Request) {
+func loginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		w.Header().Set("Content-Type", "html")
-		io.WriteString(w, "<form method=\"POST\" action=\"/upload\" "+
-			" enctype=\"multipart/form-data\">"+
-			"Choose an image to upload: <input name=\"image\" type=\"file\" />"+
-			"<input type=\"submit\" value=\"Upload\" />"+
-			"</form>")
+		t, err := template.ParseFiles("login.html")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		t.Execute(w, nil)
+	}
+	if r.Method == "POST" {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		log.Println(r.PostForm)
+		if password := r.PostFormValue("password"); password != "220612" {
+			log.Println("login:", password)
+			http.Error(w, "password error", http.StatusInternalServerError)
+			return
+		}
+
+		session := session.Start(w, r)
+		session.Set("status", "OK")
+		log.Println("login ok")
+		http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
+	}
+}
+
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	session := session.Start(w, r)
+	if session.Get("status") != "OK" {
+		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		return
+	}
+	if r.Method == "GET" {
+		t, err := template.ParseFiles("upload.html")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		t.Execute(w, nil)
 		return
 	}
 	if r.Method == "POST" {
@@ -68,21 +105,38 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func listHandler(w http.ResponseWriter, r *http.Request) {
+	session := session.Start(w, r)
+	if session.Get("status") != "OK" {
+		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		return
+	}
+
 	fileInfoArr, err := ioutil.ReadDir("./uploads")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	locals := make(map[string]interface{})
+	images := []string{}
+	for _, fileInfo := range fileInfoArr {
+		images = append(images, fileInfo.Name())
+	}
+	locals["images"] = images
+	t, err := template.ParseFiles("list.html")
 	if err != nil {
 		http.Error(w, err.Error(),
 			http.StatusInternalServerError)
 		return
 	}
-	var listHtml string
-	for _, fileInfo := range fileInfoArr {
-		imgid := fileInfo.Name()
-		listHtml += "<li><a href=\"/view?id=" + imgid + "\">imgid</a></li>"
-	}
-	io.WriteString(w, "<ol>"+listHtml+"</ol>")
+	t.Execute(w, locals)
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request) {
+	session := session.Start(w, r)
+	if session.Get("status") != "OK" {
+		http.Redirect(w, r, "/login", http.StatusTemporaryRedirect)
+		return
+	}
 	imageId := r.FormValue("id")
 	imagePath := UPLOAD_DIR + "/" + imageId
 	w.Header().Set("Content-Type", "image")
@@ -95,4 +149,12 @@ func isExists(path string) bool {
 		return true
 	}
 	return os.IsExist(err)
+}
+
+func renderHtml(w http.ResponseWriter, tmpl string, locals map[string]interface{}) error {
+	t, err := template.ParseFiles(tmpl + ".html")
+	if err != nil {
+		return err
+	}
+	return t.Execute(w, locals)
 }
