@@ -96,8 +96,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/view?id="+filename,
-			http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 	}
 }
 func testHandler(w http.ResponseWriter, r *http.Request) {

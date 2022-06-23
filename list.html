@@ -4,6 +4,7 @@
 <title>List</title>
 </head>
 <body>
+    <a href="/upload">上传照片</a>
     <ol>
         {{range $.images}}
             <li><a href="/view?id={{.|urlquery}}">{{.|html}}</a></li>
